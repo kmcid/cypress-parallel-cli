@@ -14,6 +14,9 @@ Author [@kmcid](https://github.com/kmcid)
   npx parallel-cli
 ```
 
+![parallel cli](https://raw.githubusercontent.com/kmcid/assets/main/parallel-cli-recording.gif)
+
+
 ## Configuring CLI
 To run parallel tests Cypress dashboard record key is needed, to get a record key go to `Cypress dashboard project -> Project settings -> Record keys`,
 run cli then `Setup parallel cli settings -> Set project record key`
@@ -23,6 +26,11 @@ Select suites to run `Setup parallel cli settings -> Set specs/tests`, spec file
 Select available browsers where tests will run `Setup parallel cli settings -> Set browsers`, defaults to electron
 
 Select limit of parallel tests `Setup parallel cli settings -> Set parallel`, defaults to 5, maximum of 20
+
+## Running tests
+Run tests using `Run cypress tests` or `Run cypress tests (no confirmation)`, this will execute `cypress run` in separate threads
+
+To view the latest run results use `View latest test results`, this will display a table of test results and a link to Cypress dashboard recorded run
 
 ## Roadmap
 
