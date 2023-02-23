@@ -463,7 +463,11 @@ const settingsprompt = () => {
               if (dirent.isDirectory()) {
                 specs[relativedir] = []
                 traversedir(fulldir)
-              } else specs[dirname(relativedir)].push(basename(fulldir))
+              } else {
+                // root specs should be pushed to e2e folder
+                if (!specs[dirname(relativedir)]) specs.e2e.push(basename(fulldir))
+                else specs[dirname(relativedir)].push(basename(fulldir))
+              }
             })
           }
 
