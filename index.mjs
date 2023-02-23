@@ -455,7 +455,7 @@ const settingsprompt = () => {
           break
         case settingschoices[1]:
           const specsdir = resolve(__dirname, 'cypress/e2e')
-          const specs = {}
+          const specs = { e2e: [] }
           const traversedir = (source) => {
             readdirSync(source, { withFileTypes: true }).map((dirent) => {
               const fulldir = resolve(source, dirent.name)
