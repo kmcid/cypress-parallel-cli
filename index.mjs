@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * before using this, you need to install the ff dependencies, use one of commands below
  *   "conf": "^11.0.1", "inquirer": "^9.1.4", "mocha": "^10.2.0", "table": "^6.8.1", "uuid": "^9.0.0"
