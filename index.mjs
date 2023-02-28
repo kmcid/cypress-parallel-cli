@@ -45,7 +45,7 @@ const DEFAULT_REPORTER = 'parallel-cli-reporter.js'
 const DEFAULT_REPORTER_DIR = 'parallel-cli-results'
 const DEFAULT_REPORTER_DIR_PATH = resolve(__dirname, DEFAULT_REPORTER_DIR)
 // variables for conf, we do not want to fetch it everytime
-let RECORDKEY, SPECS, BROWSERS, PARALLEL, DASHBOARD
+let RECORDKEY, SPECS, ENVVARS, BROWSERS, PARALLEL, DASHBOARD
 
 // configuration of conf storage for parallel cli settings
 const config = new Conf({
@@ -54,6 +54,7 @@ const config = new Conf({
     recordkey: { type: 'string' },
     // TODO: strict mode: "items" is 1-tuple, but minItems or maxItems/additionalItems are not specified or different at path "#/properties/specs"
     specs: { type: 'array', items: [{ type: 'string' }], default: ['cypress/e2e'], minItems: 1 },
+    envvars: { type: 'string' },
     browsers: {
       type: 'array',
       items: [{ type: 'string' }],
@@ -70,6 +71,7 @@ const config = new Conf({
 const setvars = () => {
   RECORDKEY = config.get('recordkey')
   SPECS = config.get('specs')
+  ENVVARS = config.get('envvars')
   BROWSERS = config.get('browsers')
   PARALLEL = config.get('parallel')
   DASHBOARD = config.get('dashboard')
@@ -78,6 +80,7 @@ const setvars = () => {
 // reset cli config
 const resetvars = () => {
   config.delete('recordkey')
+  config.delete('envvars')
   config.delete('dashboard')
 
   config.set('specs', DEFAULT_SPECS)
@@ -104,7 +107,8 @@ const generatebanner = () => {
  | $$$$$$$/|  $$$$$$$| $$     |  $$$$$$$| $$| $$|  $$$$$$$| $$      |  $$$$$$$| $$| $$
  | $$____/  \\_______/|__/      \\_______/|__/|__/ \\_______/|__/       \\_______/|__/|__/
  | $$   -- parallel cli settings -- RECORDKEY: ${RECORDKEY || '<not set>'} --
- | $$   -- SPECS: ${SPECS} -- BROWSERS: ${BROWSERS.join(',')} -- PARALLEL: ${PARALLEL} --
+ | $$   -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
+ | $$   -- BROWSERS: ${BROWSERS.join(',')} -- PARALLEL: ${PARALLEL} --
  |__/   -- LATEST DASHBOARD RESULT: ${DASHBOARD || '<not set>'} --`
 }
 
@@ -189,6 +193,7 @@ const runtest = async () => {
   // TODO: listing spec files by folder, folder selection and greptags selection
   for (const browser of BROWSERS) {
     let command = `npx cypress run`
+    if (ENVVARS) command = command.concat(` --env ${ENVVARS}`)
     // using the func "concat" because it has the word "cat" in it, so many "concat"s
     command = command.concat(` --spec ${SPECS.map((x) => `cypress/e2e/${x.substring(1)}`).join(',')}`)
     command = command.concat(` --browser ${browser}`)
@@ -410,9 +415,10 @@ const browserlist = {
 
 const settingschoices = [
   'Set project record key',
-  'Set specs/tests',
-  'Set browsers',
-  'Set parallel',
+  'Set specs/tests to run',
+  'Set environment variables',
+  'Set target browsers',
+  'Set parallel threads count',
   'Reset defaults',
   'Reset Parallel CLI',
   'Back',
@@ -506,6 +512,20 @@ const settingsprompt = () => {
         case settingschoices[2]:
           inquirer
             .prompt({
+              type: 'input',
+              name: 'envvars',
+              message: 'Set cypress environment variables (e.g. configFile=qa)',
+              default: ENVVARS,
+            })
+            .then(({ envvars }) => {
+              config.set('envvars', envvars)
+              setvars()
+              settingsprompt()
+            })
+          break
+        case settingschoices[3]:
+          inquirer
+            .prompt({
               type: 'checkbox',
               message: 'Select which browsers to run:',
               name: 'browsers',
@@ -533,7 +553,7 @@ const settingsprompt = () => {
               settingsprompt()
             })
           break
-        case settingschoices[3]:
+        case settingschoices[4]:
           inquirer
             .prompt({
               type: 'input',
@@ -554,7 +574,7 @@ const settingsprompt = () => {
               settingsprompt()
             })
           break
-        case settingschoices[4]:
+        case settingschoices[5]:
           inquirer
             .prompt({
               type: 'confirm',
@@ -567,7 +587,7 @@ const settingsprompt = () => {
               else settingsprompt()
             })
           break
-        case settingschoices[5]:
+        case settingschoices[6]:
           inquirer
             .prompt({
               type: 'confirm',
