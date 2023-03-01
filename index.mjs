@@ -195,7 +195,12 @@ const runtest = async () => {
     let command = `npx cypress run`
     if (ENVVARS) command = command.concat(` --env ${ENVVARS}`)
     // using the func "concat" because it has the word "cat" in it, so many "concat"s
-    command = command.concat(` --spec ${SPECS.map((x) => `cypress/e2e/${x.substring(1)}`).join(',')}`)
+    command = command.concat(
+      ` --spec ${SPECS.map((x) => {
+        if (x === 'e2e') return 'cypress/e2e'
+        else return `cypress/e2e/${x.substring(1)}`
+      }).join(',')}`
+    )
     command = command.concat(` --browser ${browser}`)
     // using --headed runs for debugging purposes, maybe allow configuration?
     // command = command.concat(` --headed`)
