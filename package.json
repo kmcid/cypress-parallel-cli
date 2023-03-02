@@ -15,6 +15,10 @@
     "cli",
     "parallel"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kmcid/cypress-parallel-cli.git"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
