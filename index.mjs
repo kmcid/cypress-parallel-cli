@@ -275,7 +275,8 @@ const menuprompt = () => {
               type: 'confirm',
               name: 'confirm',
               message: `Are you sure you want to run cypress tests with these settings:
-     -- RECORDKEY: ${RECORDKEY} -- SPECS: ${SPECS} --
+     -- RECORDKEY: ${RECORDKEY || '<not set>'} --
+     -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
      -- BROWSERS: ${BROWSERS} -- PARALLEL: ${PARALLEL} --`,
               default: false,
             })
