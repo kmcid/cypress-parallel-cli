@@ -53,12 +53,17 @@ const config = new Conf({
   schema: {
     recordkey: { type: 'string' },
     // TODO: strict mode: "items" is 1-tuple, but minItems or maxItems/additionalItems are not specified or different at path "#/properties/specs"
-    specs: { type: 'array', items: [{ type: 'string' }], default: ['cypress/e2e'], minItems: 1 },
+    specs: {
+      type: 'array',
+      items: [{ type: 'string' }],
+      default: DEFAULT_SPECS,
+      minItems: 1,
+    },
     envvars: { type: 'string' },
     browsers: {
       type: 'array',
       items: [{ type: 'string' }],
-      default: ['chrome'],
+      default: DEFAULT_BROWSERS,
       minItems: 1,
     },
     parallel: { type: 'number', default: 5 },
