@@ -36,6 +36,8 @@ import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
 // const __dirname = dirname(__filename)
 const __dirname = process.cwd()
 
+const packagejson = JSON.parse(readFileSync('./package.json'))
+
 // default and global variables
 const DEFAULT_SPECS = ['cypress/e2e']
 const DEFAULT_BROWSERS = ['electron']
@@ -49,7 +51,7 @@ let RECORDKEY, SPECS, ENVVARS, BROWSERS, PARALLEL, DASHBOARD
 
 // configuration of conf storage for parallel cli settings
 const config = new Conf({
-  projectName: 'parallel-cli',
+  projectName: packagejson.name,
   schema: {
     recordkey: { type: 'string' },
     // TODO: strict mode: "items" is 1-tuple, but minItems or maxItems/additionalItems are not specified or different at path "#/properties/specs"
@@ -673,7 +675,6 @@ const getavailablebrowsers = () => {
       // https://docs.cypress.io/guides/guides/launching-browsers#WebKit-Experimental
       console.log(chalk.bold.greenBright(`Detecting availability of webkit browser`))
       // check packagejson for installed webkit dependency
-      const packagejson = JSON.parse(readFileSync('./package.json'))
       const playrightwebkit =
         (packagejson.dependencies || {})['playwright-webkit'] ||
         (packagejson.devDependencies || {})['playwright-webkit']
