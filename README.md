@@ -27,6 +27,8 @@ Select available browsers where tests will run `Setup parallel cli settings -> S
 
 Select limit of parallel tests `Setup parallel cli settings -> Set parallel`, defaults to 5, maximum of 20
 
+Set cypress environment variables `Setup parallel cli settings -> Set environment variables`, variables are comma separated
+
 ## Running tests
 Run tests using `Run cypress tests` or `Run cypress tests (no confirmation)`, this will execute `cypress run` in separate threads
 
@@ -34,6 +36,5 @@ To view the latest run results use `View latest test results`, this will display
 
 ## Roadmap
 
-- Test using cypress in windows machine
 - Add resource monitoring
 
