@@ -36,7 +36,9 @@ import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
 // const __dirname = dirname(__filename)
 const __dirname = process.cwd()
 
-const packagejson = JSON.parse(readFileSync('./package.json'))
+const packagejson = JSON.parse(readFileSync(resolve(__dirname, 'package.json')))
+// sometimes package.json does not have a name, use folder name
+const packagejsonname = packagejson?.name || basename(__dirname)
 
 // default and global variables
 const DEFAULT_SPECS = ['cypress/e2e']
@@ -51,7 +53,7 @@ let RECORDKEY, SPECS, ENVVARS, BROWSERS, PARALLEL, DASHBOARD
 
 // configuration of conf storage for parallel cli settings
 const config = new Conf({
-  projectName: packagejson.name,
+  projectName: packagejsonname,
   schema: {
     recordkey: { type: 'string' },
     // TODO: strict mode: "items" is 1-tuple, but minItems or maxItems/additionalItems are not specified or different at path "#/properties/specs"
