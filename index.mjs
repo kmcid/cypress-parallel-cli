@@ -52,12 +52,18 @@ const DEFAULT_REPORTER = 'parallel-cli-reporter.js'
 const DEFAULT_REPORTER_DIR = 'parallel-cli-results'
 const DEFAULT_REPORTER_DIR_PATH = resolve(__dirname, DEFAULT_REPORTER_DIR)
 // variables for conf, we do not want to fetch it everytime
-let RECORDKEY, SPECS, ENVVARS, BROWSERS, PARALLEL, DASHBOARD
+let PRESET, PRESETS, RECORDKEY, SPECS, ENVVARS, BROWSERS, PARALLEL, DASHBOARD
 
 // configuration of conf storage for parallel cli settings
 const config = new Conf({
   projectName: packagejsonname,
   schema: {
+    preset: { type: 'string' },
+    presets: {
+      type: 'array',
+      items: [{ type: 'object' }],
+      minItems: 0,
+    },
     recordkey: { type: 'string' },
     // TODO: strict mode: "items" is 1-tuple, but minItems or maxItems/additionalItems are not specified or different at path "#/properties/specs"
     specs: {
@@ -81,16 +87,21 @@ const config = new Conf({
 
 // set config variables
 const setvars = () => {
-  RECORDKEY = config.get('recordkey')
-  SPECS = config.get('specs')
-  ENVVARS = config.get('envvars')
-  BROWSERS = config.get('browsers')
-  PARALLEL = config.get('parallel')
+  // use default values if config is not found
+  PRESET = config.get('preset')
+  PRESETS = config.get('presets') || []
   DASHBOARD = config.get('dashboard')
+  RECORDKEY = config.get('recordkey')
+  SPECS = config.get('specs') || DEFAULT_SPECS
+  ENVVARS = config.get('envvars')
+  BROWSERS = config.get('browsers') || DEFAULT_BROWSERS
+  PARALLEL = config.get('parallel') || DEFAULT_PARALLEL
 }
 
 // reset cli config
 const resetvars = () => {
+  config.delete('preset')
+  config.delete('presets')
   config.delete('recordkey')
   config.delete('envvars')
   config.delete('dashboard')
@@ -99,6 +110,19 @@ const resetvars = () => {
   config.set('browsers', DEFAULT_BROWSERS)
   config.set('parallel', DEFAULT_PARALLEL)
   setvars()
+}
+
+const loadpreset = () => {
+  if (!PRESET) return
+  // load presets if available
+  const preset = PRESETS.find((p) => p.name === PRESET)
+  if (preset) {
+    RECORDKEY = preset.recordkey
+    SPECS = preset.specs || DEFAULT_SPECS
+    ENVVARS = preset.envvars
+    BROWSERS = preset.browsers || DEFAULT_BROWSERS
+    PARALLEL = preset.parallel || DEFAULT_PARALLEL
+  }
 }
 
 // clear cli then display banner
@@ -242,24 +266,46 @@ const runtest = async () => {
 }
 
 const askexit2menu = async () => {
-  inquirer.prompt({
-    name: 'mainmenu',
-    type: 'press-to-continue',
-    anyKey: true,
-    pressToContinueMessage: 'Press any key to return to main menu ...',
-  }).then(() => {
-    menuprompt()
-  })
+  inquirer
+    .prompt({
+      name: 'mainmenu',
+      type: 'press-to-continue',
+      anyKey: true,
+      pressToContinueMessage: 'Press any key to return to main menu ...',
+    })
+    .then(() => {
+      menuprompt()
+    })
 }
 
-const menuchoices = [
-  'Run cypress tests',
-  'Run cypress tests (no confirmation)',
-  'View latest test results',
-  'Setup parallel cli settings',
-  'Help me',
-  'Exit',
-]
+const addnewpreset = (presetname) => {
+  PRESETS = [
+    ...PRESETS,
+    {
+      name: presetname,
+      recordkey: RECORDKEY,
+      specs: SPECS,
+      envvars: ENVVARS,
+      browsers: BROWSERS,
+      parallel: PARALLEL,
+    },
+  ]
+  PRESET = presetname
+  config.set('preset', PRESET)
+  config.set('presets', PRESETS)
+}
+
+const menuchoices = () => {
+  return [
+    'Run cypress tests',
+    'Run cypress tests (no confirmation)',
+    'View latest test results',
+    'Setup parallel cli settings',
+    `Load preset ${PRESET ? `(preset: ${PRESET})` : ''}`,
+    'Help me',
+    'Exit',
+  ]
+}
 const menuprompt = () => {
   resetcli()
 
@@ -268,11 +314,11 @@ const menuprompt = () => {
       type: 'list',
       name: 'menu',
       message: 'What do you like to do?',
-      choices: menuchoices,
+      choices: menuchoices(),
     })
     .then(async ({ menu }) => {
       switch (menu) {
-        case menuchoices[0]:
+        case menuchoices()[0]:
           // blah, blah, blah, r u sure 'bout this?
           inquirer
             .prompt({
@@ -289,11 +335,11 @@ const menuprompt = () => {
               else menuprompt()
             })
           break
-        case menuchoices[1]:
+        case menuchoices()[1]:
           // no blah, blah, blah, just run my test
           await runtest()
           break
-        case menuchoices[2]:
+        case menuchoices()[2]:
           // proceed only when results folder exists
           if (!existsSync(DEFAULT_REPORTER_DIR_PATH)) {
             console.log(chalk.redBright('parallel-cli-results folder does not exist, unable to get test results.'))
@@ -392,10 +438,40 @@ const menuprompt = () => {
             askexit2menu()
           }
           break
-        case menuchoices[3]:
+        case menuchoices()[3]:
           settingsprompt()
           break
-        case menuchoices[4]:
+        case menuchoices()[4]:
+          // TODO: add presets here
+          if (!PRESET) {
+            console.log(chalk.whiteBright(`No presets are available, creating default preset from current settings`))
+            addnewpreset('DEFAULT')
+            await sleep(2000)
+            config.set('preset', 'DEFAULT')
+          }
+
+          inquirer
+            .prompt({
+              type: 'list',
+              name: 'preset',
+              message: 'Select which preset to load',
+              default: PRESET,
+              choices: PRESETS.map((p) => {
+                return {
+                  // TODO: customise preset name to be descriptive
+                  name: `${p.name}`,
+                  value: p.name,
+                }
+              }),
+            })
+            .then(({ preset }) => {
+              PRESET = preset
+              config.set('preset', PRESET)
+              loadpreset()
+              menuprompt()
+            })
+          break
+        case menuchoices()[5]:
           console.log(chalk.bold.whiteBright(`Read README.md to learn how to setup and use parallel-cli`))
           console.log(chalk.greenBright('Opening readme documentation in 2s...'))
           await sleep(2000)
@@ -434,6 +510,7 @@ const settingschoices = [
   'Set environment variables',
   'Set target browsers',
   'Set parallel threads count',
+  'Save current settings as preset',
   'Reset defaults',
   'Reset Parallel CLI',
   'Back',
@@ -474,6 +551,9 @@ const settingsprompt = () => {
               config.set('recordkey', recordkey)
               setvars()
               settingsprompt()
+
+              // since settings were changed, show custom preset
+              PRESET = 'CUSTOM'
             })
           break
         case settingschoices[1]:
@@ -510,7 +590,7 @@ const settingsprompt = () => {
           inquirer
             .prompt({
               type: 'checkbox',
-              message: 'Select which suites to run:',
+              message: 'Select which suites to run',
               name: 'specs',
               choices: suiteschoices,
               validate(answer) {
@@ -522,6 +602,8 @@ const settingsprompt = () => {
               config.set('specs', specs)
               setvars()
               settingsprompt()
+
+              PRESET = 'CUSTOM'
             })
           break
         case settingschoices[2]:
@@ -536,6 +618,8 @@ const settingsprompt = () => {
               config.set('envvars', envvars)
               setvars()
               settingsprompt()
+
+              PRESET = 'CUSTOM'
             })
           break
         case settingschoices[3]:
@@ -566,6 +650,8 @@ const settingsprompt = () => {
               config.set('browsers', browsers)
               setvars()
               settingsprompt()
+
+              PRESET = 'CUSTOM'
             })
           break
         case settingschoices[4]:
@@ -587,9 +673,35 @@ const settingsprompt = () => {
               config.set('parallel', Math.abs(parseInt(parallel)))
               setvars()
               settingsprompt()
+
+              PRESET = 'CUSTOM'
             })
           break
         case settingschoices[5]:
+          inquirer
+            .prompt({
+              type: 'input',
+              name: 'preset',
+              message: 'What would you like to name this preset?\nThis will overwrite existing preset with same name',
+              default: PRESET,
+              validate(answer) {
+                if (answer.length < 3)
+                  return 'Preset name should be longer than 3 characters, a little bit descriptive please'
+                if (!/^[A-Z\-]+$/i.test(answer))
+                  return 'Preset name should be not contain any number or special characters other than -'
+                return true
+              },
+            })
+            .then(({ preset }) => {
+              // remove existing preset, will be overwritten by new settings
+              const existsindex = PRESETS.findIndex((p) => p.name === preset)
+              if (existsindex > -1) PRESETS.splice(existsindex, 1)
+
+              addnewpreset(preset)
+              settingsprompt()
+            })
+          break
+        case settingschoices[6]:
           inquirer
             .prompt({
               type: 'confirm',
@@ -602,7 +714,7 @@ const settingsprompt = () => {
               else settingsprompt()
             })
           break
-        case settingschoices[6]:
+        case settingschoices[7]:
           inquirer
             .prompt({
               type: 'confirm',
@@ -716,6 +828,9 @@ const getavailablebrowsers = () => {
 }
 
 ;(async () => {
+  // clearing console to remove config warnings
+  console.clear()
+
   // setup parallel-cli defaults and cli reporter
   if (!config.get('init')) {
     console.log(chalk.bold.greenBright(`Initialising parallel-cli configuration`))
@@ -745,6 +860,7 @@ const getavailablebrowsers = () => {
     console.log(chalk.greenBright(`Parallel-cli has been initialised successfully`))
   } else {
     setvars()
+    loadpreset()
     await getavailablebrowsers()
   }
 

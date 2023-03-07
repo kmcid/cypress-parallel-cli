@@ -29,6 +29,8 @@ Select limit of parallel tests `Setup parallel cli settings -> Set parallel`, de
 
 Set cypress environment variables `Setup parallel cli settings -> Set environment variables`, variables are comma separated
 
+Current settings can be saved as Presets `Setup parallel cli settings -> Save current settings as preset`, once saved preset can be loaded from the main menu
+
 ## Running tests
 Run tests using `Run cypress tests` or `Run cypress tests (no confirmation)`, this will execute `cypress run` in separate threads
 
