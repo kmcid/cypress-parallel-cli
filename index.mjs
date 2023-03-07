@@ -30,6 +30,9 @@ import { dirname, resolve, basename } from 'path'
 import { writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
 
+import PressToContinuePrompt from 'inquirer-press-to-continue'
+inquirer.registerPrompt('press-to-continue', PressToContinuePrompt)
+
 // __dirname is not working (used for fetching specs):
 // https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c#what-do-i-use-instead-of-__dirname-and-__filename
 // const __filename = fileURLToPath(import.meta.url)
@@ -238,18 +241,15 @@ const runtest = async () => {
   askexit2menu()
 }
 
-const askexit2menu = () => {
-  inquirer
-    .prompt({
-      type: 'confirm',
-      name: 'confirm',
-      message: 'Return to main menu?',
-      default: true,
-    })
-    .then(({ confirm }) => {
-      if (confirm) menuprompt()
-      else askexit2menu()
-    })
+const askexit2menu = async () => {
+  inquirer.prompt({
+    name: 'mainmenu',
+    type: 'press-to-continue',
+    anyKey: true,
+    pressToContinueMessage: 'Press any key to return to main menu ...',
+  }).then(() => {
+    menuprompt()
+  })
 }
 
 const menuchoices = [
