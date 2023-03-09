@@ -539,6 +539,7 @@ const settingsprompt = () => {
               validate(answer) {
                 // record key is a uuid version 4 format
                 if (
+                  answer &&
                   !/^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi.test(
                     answer
                   )
