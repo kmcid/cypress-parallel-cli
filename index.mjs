@@ -284,7 +284,6 @@ const runtest = async () => {
       renameSync(resolve(DEFAULT_REPORTER_DIR_PATH, dirent.name), resolve(browserdir, dirent.name))
     }
   }
-  askexit2menu()
 }
 
 const askexit2menu = async () => {
@@ -315,6 +314,93 @@ const addnewpreset = (presetname) => {
   PRESET = presetname
   config.set('preset', PRESET)
   config.set('presets', PRESETS)
+}
+
+const showcliresultstable = () => {
+  const spanningcells = []
+
+  // results are grouped by browser. extract results from each browser folder, results are stored in JSON
+  let tabledata = getdirectories(DEFAULT_REPORTER_DIR_PATH).map((dir) => {
+    const totals = { tests: 0, passes: 0, failures: 0, duration: 0 }
+    const results = readdirSync(resolve(DEFAULT_REPORTER_DIR_PATH, dir))
+      // we are using readFileSync here because require(jsonfile) does not work in .mjs, anyway it works the same
+      .map((file) => JSON.parse(readFileSync(resolve(DEFAULT_REPORTER_DIR_PATH, dir, file))))
+      .reduce((a, c) => {
+        a.push([dir, c.file, c.start, c.tests, c.passes, c.failures, c.duration])
+        // increment our totals counter (for tallying data)
+        totals.tests += c.tests
+        totals.passes += c.passes
+        totals.failures += c.failures
+        totals.duration += c.duration
+        return a
+      }, [])
+
+    return [...results, ['Totals', '', '', totals.tests, totals.passes, totals.failures, totals.duration]]
+  })
+
+  // to hard to explain but spanning cells are needed to group repeated cells
+  // https://www.npmjs.com/package/table#user-content-configspanningcells
+  for (const group of tabledata) {
+    // tldr; added some magical calculations in generating spanning cells
+    const lastspanningcell = spanningcells[spanningcells.length - 1]
+    const lastrow = lastspanningcell ? lastspanningcell.row + 1 : 1
+    // spanning cell for browser group, spans the length of results
+    spanningcells.push({
+      col: 0,
+      row: lastrow,
+      rowSpan: group.length - 1,
+      verticalAlignment: 'middle',
+    })
+    // spanning cell for totals, covers 3 columns, always the row from browser group
+    spanningcells.push({
+      col: 0,
+      row: lastrow + group.length - 1,
+      colSpan: 3,
+      alignment: 'center',
+    })
+  }
+
+  // flatten table data to combine grouped results
+  tabledata = tabledata.flat()
+
+  // colorize table data
+  tabledata = tabledata.map((x) => [
+    chalk.bold.cyanBright(x[0]),
+    chalk.bold.whiteBright(x[1]),
+    x[2],
+    chalk.cyanBright(x[3]),
+    chalk.greenBright(x[4]),
+    chalk.redBright(x[5]),
+    chalk.yellowBright(x[6]),
+  ])
+
+  // add table headers
+  tabledata.unshift(
+    ['Browser', 'Spec', 'Date', 'Tests', 'Passed', 'Failed', 'Duration'].map((x) => chalk.bold.greenBright(x))
+  )
+
+  /**
+   * "tabledata" should look like this (without the gibberish coloring), real data log from canvas project
+   * so yes, stop wondering how this "tabledata" looks like before it is displayed beautifully
+   * [
+   *  ['Browser','Spec','Date','Tests','Passed','Failed','Duration'],
+   *  ["chrome","cypress/e2e/canvas-regression/buttons.cy.ts","2023-02-20T18:05:02.707Z",3,3,0,66959],
+   *  ["chrome","cypress/e2e/canvas-regression/sidebar.cy.ts","2023-02-20T18:05:09.745Z",1,1,0,13391],
+   *  ["Totals", "", "", 4, 4, 0, 80350],
+   *  ["electron","cypress/e2e/canvas-regression/buttons.cy.ts","2023-02-20T18:02:30.555Z",3,3,0,78557],
+   *  ["electron","cypress/e2e/canvas-regression/sidebar.cy.ts","2023-02-20T18:02:29.624Z",1,1,0,16392],
+   *  ["Totals", "", "", 4, 4, 0, 94949],
+   * ]
+   */
+
+  console.log('\n')
+  console.log(table(tabledata, { columns: [{ alignment: 'center', width: 12 }], spanningCells: spanningcells }))
+
+  // optionally display recorded cypress dashboard run link
+  if (DASHBOARD) {
+    process.stdout.write(`${chalk.bold.blueBright('⏺️  Cypress dashboard record (click link to navigate): ')}`)
+    console.log(`${chalk.bold.whiteBright(DASHBOARD)}\n`)
+  }
 }
 
 const menuchoices = () => {
@@ -353,8 +439,10 @@ const menuprompt = () => {
               default: false,
             })
             .then(async ({ confirm }) => {
-              if (confirm) await runtest()
-              else menuprompt()
+              if (confirm) {
+                await runtest()
+                askexit2menu()
+              } else menuprompt()
             })
           break
         case menuchoices()[1]:
@@ -362,6 +450,7 @@ const menuprompt = () => {
           const _RECORDKEY = RECORDKEY
           RECORDKEY = ''
           await runtest()
+          askexit2menu()
           RECORDKEY = _RECORDKEY
           break
         case menuchoices()[2]:
@@ -371,95 +460,7 @@ const menuprompt = () => {
             console.log(chalk.redBright('maybe you should run your tests first. returning to main menu in 3s...'))
             setTimeout(() => menuprompt(), 3000)
           } else {
-            const spanningcells = []
-
-            // results are grouped by browser. extract results from each browser folder, results are stored in JSON
-            let tabledata = getdirectories(DEFAULT_REPORTER_DIR_PATH).map((dir) => {
-              const totals = { tests: 0, passes: 0, failures: 0, duration: 0 }
-              const results = readdirSync(resolve(DEFAULT_REPORTER_DIR_PATH, dir))
-                // we are using readFileSync here because require(jsonfile) does not work in .mjs, anyway it works the same
-                .map((file) => JSON.parse(readFileSync(resolve(DEFAULT_REPORTER_DIR_PATH, dir, file))))
-                .reduce((a, c) => {
-                  a.push([dir, c.file, c.start, c.tests, c.passes, c.failures, c.duration])
-                  // increment our totals counter (for tallying data)
-                  totals.tests += c.tests
-                  totals.passes += c.passes
-                  totals.failures += c.failures
-                  totals.duration += c.duration
-                  return a
-                }, [])
-
-              return [...results, ['Totals', '', '', totals.tests, totals.passes, totals.failures, totals.duration]]
-            })
-
-            // to hard to explain but spanning cells are needed to group repeated cells
-            // https://www.npmjs.com/package/table#user-content-configspanningcells
-            for (const group of tabledata) {
-              // tldr; added some magical calculations in generating spanning cells
-              const lastspanningcell = spanningcells[spanningcells.length - 1]
-              const lastrow = lastspanningcell ? lastspanningcell.row + 1 : 1
-              // spanning cell for browser group, spans the length of results
-              spanningcells.push({
-                col: 0,
-                row: lastrow,
-                rowSpan: group.length - 1,
-                verticalAlignment: 'middle',
-              })
-              // spanning cell for totals, covers 3 columns, always the row from browser group
-              spanningcells.push({
-                col: 0,
-                row: lastrow + group.length - 1,
-                colSpan: 3,
-                alignment: 'center',
-              })
-            }
-
-            // flatten table data to combine grouped results
-            tabledata = tabledata.flat()
-
-            // colorize table data
-            tabledata = tabledata.map((x) => [
-              chalk.bold.cyanBright(x[0]),
-              chalk.bold.whiteBright(x[1]),
-              x[2],
-              chalk.cyanBright(x[3]),
-              chalk.greenBright(x[4]),
-              chalk.redBright(x[5]),
-              chalk.yellowBright(x[6]),
-            ])
-
-            // add table headers
-            tabledata.unshift(
-              ['Browser', 'Spec', 'Date', 'Tests', 'Passed', 'Failed', 'Duration'].map((x) => chalk.bold.greenBright(x))
-            )
-
-            /**
-             * "tabledata" should look like this (without the gibberish coloring), real data log from canvas project
-             * so yes, stop wondering how this "tabledata" looks like before it is displayed beautifully
-             * [
-             *  ['Browser','Spec','Date','Tests','Passed','Failed','Duration'],
-             *  ["chrome","cypress/e2e/canvas-regression/buttons.cy.ts","2023-02-20T18:05:02.707Z",3,3,0,66959],
-             *  ["chrome","cypress/e2e/canvas-regression/sidebar.cy.ts","2023-02-20T18:05:09.745Z",1,1,0,13391],
-             *  ["Totals", "", "", 4, 4, 0, 80350],
-             *  ["electron","cypress/e2e/canvas-regression/buttons.cy.ts","2023-02-20T18:02:30.555Z",3,3,0,78557],
-             *  ["electron","cypress/e2e/canvas-regression/sidebar.cy.ts","2023-02-20T18:02:29.624Z",1,1,0,16392],
-             *  ["Totals", "", "", 4, 4, 0, 94949],
-             * ]
-             */
-
-            console.log('\n')
-            console.log(
-              table(tabledata, { columns: [{ alignment: 'center', width: 12 }], spanningCells: spanningcells })
-            )
-
-            // optionally display recorded cypress dashboard run link
-            if (DASHBOARD) {
-              process.stdout.write(
-                `${chalk.bold.blueBright('⏺️  Cypress dashboard record (click link to navigate): ')}`
-              )
-              console.log(`${chalk.bold.whiteBright(DASHBOARD)}\n`)
-            }
-
+            showcliresultstable()
             askexit2menu()
           }
           break
@@ -839,6 +840,44 @@ const getavailablebrowsers = () => {
 ;(async () => {
   // clearing console to remove config warnings
   console.clear()
+
+  // catch RUN command for direct preset runs
+  const args = process.argv.slice(2)
+  if (args.length >= 1) {
+    setvars()
+    if (args[1] && !PRESETS.find((p) => p.name === args[1]))
+      throw new Error(`Preset "${args[1]}" was not found in cli presets`)
+    else {
+      PRESET = args[1]
+      loadpreset()
+    }
+
+    if (args[0] === 'run') await runtest()
+    else if (args[0] === 'run-norecord') {
+      // remove RECORDKEY before running tests to disable recording
+      const _RECORDKEY = RECORDKEY
+      RECORDKEY = ''
+      await runtest()
+      RECORDKEY = _RECORDKEY
+    } else throw new Error(`Unknown cli command "${args[0]}"`)
+
+    showcliresultstable()
+
+    inquirer
+      .prompt({
+        name: 'exit',
+        type: 'press-to-continue',
+        anyKey: true,
+        pressToContinueMessage: 'Press any key to exit cli runner ...',
+      })
+      .then(() => {
+        // push down extra texts after: ⠦ Press any key to exit cli runner ...aksjdkjqwqwd
+        console.log()
+        process.exitCode = 1
+      })
+
+    return
+  }
 
   // setup parallel-cli defaults and cli reporter
   if (!config.get('init')) {
