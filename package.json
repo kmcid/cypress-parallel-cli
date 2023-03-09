@@ -24,8 +24,10 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
+    "async": "^3.2.4",
     "chalk": "^5.2.0",
     "conf": "^11.0.1",
+    "glob": "^9.2.1",
     "inquirer": "^9.1.4",
     "inquirer-press-to-continue": "^1.1.4",
     "mocha": "^10.2.0",

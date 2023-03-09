@@ -22,6 +22,8 @@ import chalk from 'chalk'
 import inquirer from 'inquirer'
 import open from 'open'
 import { table } from 'table'
+import { globSync } from 'glob'
+import { parallelLimit } from 'async'
 import { v4 as uuidv4 } from 'uuid'
 
 import { spawn } from 'node:child_process'
@@ -44,7 +46,8 @@ const packagejson = JSON.parse(readFileSync(resolve(__dirname, 'package.json')))
 const packagejsonname = packagejson?.name || basename(__dirname)
 
 // default and global variables
-const DEFAULT_SPECS = ['cypress/e2e']
+const DEFAULT_SPECS_DIR = 'cypress/e2e'
+const DEFAULT_SPECS = [DEFAULT_SPECS_DIR]
 const DEFAULT_BROWSERS = ['electron']
 const DEFAULT_PARALLEL = 5
 const MAX_PARALLEL_ALLOWED = 20
@@ -149,6 +152,7 @@ const generatebanner = () => {
 }
 
 // from the name itself, it gets the directories from provided path
+// TODO: refactor this using glob lib
 const getdirectories = (source) =>
   readdirSync(source, { withFileTypes: true })
     .filter((dirent) => dirent.isDirectory())
@@ -224,34 +228,53 @@ const runtest = async () => {
   // https://docs.cypress.io/guides/guides/parallelization#Linking-CI-machines-for-parallelization-or-grouping
   const uuid = uuidv4()
 
+  const suites = SPECS.map((suite) => {
+    if (['e2e', 'cypress/e2e'].includes(suite)) return 'cypress/e2e'
+    else return `cypress/e2e/${suite}`
+  })
+
   // cypress run command builder
   // TODO: find improvements. current threads/parallel runs per browser
   // TODO: listing spec files by folder, folder selection and greptags selection
   for (const browser of BROWSERS) {
     let command = `npx cypress run`
     if (ENVVARS) command = command.concat(` --env ${ENVVARS}`)
-    // using the func "concat" because it has the word "cat" in it, so many "concat"s
-    command = command.concat(
-      ` --spec ${SPECS.map((x) => {
-        if (x === 'e2e') return 'cypress/e2e'
-        else return `cypress/e2e/${x.substring(1)}`
-      }).join(',')}`
-    )
     command = command.concat(` --browser ${browser}`)
     // using --headed runs for debugging purposes, maybe allow configuration?
     // command = command.concat(` --headed`)
     command = command.concat(` --reporter ./${DEFAULT_REPORTER}`)
+
     if (RECORDKEY) {
+      command = command.concat(` --spec ${suites.join(',')}`)
       command = command.concat(` --group ${browser} --record --key ${RECORDKEY}`)
       command = command.concat(` --parallel --ci-build-id ${uuid}`)
-    }
 
-    // run array of threads limited by parallel count
-    await Promise.all(
-      Array(PARALLEL)
-        .fill(undefined)
-        .map((_, index) => runnerthread(command, index))
-    )
+      // run array of threads limited by parallel count
+      // cypress dashboard will handle parallellization of tests
+      await Promise.all(
+        Array(PARALLEL)
+          .fill(undefined)
+          .map((_, index) => runnerthread(command, index))
+      )
+    } else {
+      await parallelLimit(
+        // TODO: handle non spec files inside e2e folder
+        suites
+          .map((suite) =>
+            globSync(`${resolve(__dirname, suite)}/**`, { withFileTypes: true })
+              .filter((path) => path.isFile())
+              .map((file) => file.fullpath())
+          )
+          .flat()
+          .map((spec, index) => {
+            return (callback) => {
+              const finalcommand = command.concat(` --spec ${spec}`)
+              runnerthread(finalcommand, index).then(() => callback(null))
+            }
+          }),
+        PARALLEL
+      )
+    }
 
     // move results to browser specific results folder
     for (const dirent of readdirSync(DEFAULT_REPORTER_DIR_PATH, { withFileTypes: true })) {
@@ -261,7 +284,6 @@ const runtest = async () => {
       renameSync(resolve(DEFAULT_REPORTER_DIR_PATH, dirent.name), resolve(browserdir, dirent.name))
     }
   }
-
   askexit2menu()
 }
 
@@ -298,7 +320,7 @@ const addnewpreset = (presetname) => {
 const menuchoices = () => {
   return [
     'Run cypress tests',
-    'Run cypress tests (no confirmation)',
+    'Run cypress tests (not recorded)',
     'View latest test results',
     'Setup parallel cli settings',
     `Load preset ${PRESET ? `(preset: ${PRESET})` : ''}`,
@@ -336,8 +358,11 @@ const menuprompt = () => {
             })
           break
         case menuchoices()[1]:
-          // no blah, blah, blah, just run my test
+          // remove RECORDKEY before running tests to disable recording
+          const _RECORDKEY = RECORDKEY
+          RECORDKEY = ''
           await runtest()
+          RECORDKEY = _RECORDKEY
           break
         case menuchoices()[2]:
           // proceed only when results folder exists
@@ -443,7 +468,7 @@ const menuprompt = () => {
           break
         case menuchoices()[4]:
           // TODO: add presets here
-          if (!PRESET) {
+          if (!PRESET || PRESET === 'CUSTOM') {
             console.log(chalk.whiteBright(`No presets are available, creating default preset from current settings`))
             addnewpreset('DEFAULT')
             await sleep(2000)
@@ -558,32 +583,15 @@ const settingsprompt = () => {
             })
           break
         case settingschoices[1]:
-          const specsdir = resolve(__dirname, 'cypress/e2e')
-          const specs = { e2e: [] }
-          const traversedir = (source) => {
-            readdirSync(source, { withFileTypes: true }).map((dirent) => {
-              const fulldir = resolve(source, dirent.name)
-              const relativedir = fulldir.replace(specsdir, '')
-              if (dirent.isDirectory()) {
-                specs[relativedir] = []
-                traversedir(fulldir)
-              } else {
-                // root specs should be pushed to e2e folder
-                if (!specs[dirname(relativedir)]) specs.e2e.push(basename(fulldir))
-                else specs[dirname(relativedir)].push(basename(fulldir))
-              }
-            })
-          }
-
-          // create a map of cypress/e2e folder
-          traversedir(specsdir)
+          // get suites under cypress/e2e
+          const suites = globSync(`${resolve(__dirname, DEFAULT_SPECS_DIR)}/**`, { withFileTypes: true })
+            .filter((g) => g.isDirectory())
+            .map((g) => basename(g.fullpath()))
 
           // generate choices, currently allowing suites/folder choices
-          const suiteschoices = Object.entries(specs).reduce((a, [k, v]) => {
-            a.push({ name: k, value: k, checked: SPECS.includes(k) })
-            // for (const s of v) a.push({ name: `  - ${s}`, value: s })
-            return a
-          }, [])
+          const suitechoices = suites.map((suite) => {
+            return { name: suite, value: suite, checked: SPECS.includes(suite) }
+          })
 
           // current implementation: allows selection of folders in cypress/e2e
           // then each cypress test (1 level) in that folder will be executed
@@ -593,7 +601,7 @@ const settingsprompt = () => {
               type: 'checkbox',
               message: 'Select which suites to run',
               name: 'specs',
-              choices: suiteschoices,
+              choices: suitechoices,
               validate(answer) {
                 if (answer.length < 1) return 'You must choose at least one suite'
                 return true
