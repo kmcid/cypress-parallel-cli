@@ -28,7 +28,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { spawn } from 'node:child_process'
 // import { fileURLToPath } from 'url'
-import { dirname, resolve, basename } from 'path'
+import { resolve, basename } from 'path'
 import { writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
 
@@ -46,7 +46,8 @@ const packagejson = JSON.parse(readFileSync(resolve(__dirname, 'package.json')))
 const packagejsonname = packagejson?.name || basename(__dirname)
 
 // default and global variables
-const DEFAULT_SPECS_DIR = 'cypress/e2e'
+const DEFAULT_CYPRESS_DIR = 'cypress'
+const DEFAULT_SPECS_DIR = 'e2e'
 const DEFAULT_SPECS = [DEFAULT_SPECS_DIR]
 const DEFAULT_BROWSERS = ['electron']
 const DEFAULT_PARALLEL = 5
@@ -137,18 +138,18 @@ const resetcli = () => {
 // ASCII Art from: https://patorjk.com/software/taag/#p=display&h=1&v=2&f=Big%20Money-ne&t=parallel%20cli
 const generatebanner = () => {
   return `
-                                         /$$ /$$           /$$                 /$$ /$$
-                                        | $$| $$          | $$                | $$|__/
-   /$$$$$$   /$$$$$$   /$$$$$$  /$$$$$$ | $$| $$  /$$$$$$ | $$        /$$$$$$$| $$ /$$
-  /$$__  $$ |____  $$ /$$__  $$|____  $$| $$| $$ /$$__  $$| $$       /$$_____/| $$| $$
- | $$  \\ $$  /$$$$$$$| $$  \\__/ /$$$$$$$| $$| $$| $$$$$$$$| $$      | $$      | $$| $$
- | $$  | $$ /$$__  $$| $$      /$$__  $$| $$| $$| $$_____/| $$      | $$      | $$| $$
- | $$$$$$$/|  $$$$$$$| $$     |  $$$$$$$| $$| $$|  $$$$$$$| $$      |  $$$$$$$| $$| $$
- | $$____/  \\_______/|__/      \\_______/|__/|__/ \\_______/|__/       \\_______/|__/|__/
- | $$   -- parallel cli settings -- RECORDKEY: ${RECORDKEY || '<not set>'} --
- | $$   -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
- | $$   -- BROWSERS: ${BROWSERS.join(',')} -- PARALLEL: ${PARALLEL} --
- |__/   -- LATEST DASHBOARD RESULT: ${DASHBOARD || '<not set>'} --`
+                                          /$$ /$$           /$$                 /$$ /$$
+                                         | $$| $$          | $$                | $$|__/
+    /$$$$$$   /$$$$$$   /$$$$$$  /$$$$$$ | $$| $$  /$$$$$$ | $$        /$$$$$$$| $$ /$$
+   /$$__  $$ |____  $$ /$$__  $$|____  $$| $$| $$ /$$__  $$| $$       /$$_____/| $$| $$
+  | $$  \\ $$  /$$$$$$$| $$  \\__/ /$$$$$$$| $$| $$| $$$$$$$$| $$      | $$      | $$| $$
+  | $$  | $$ /$$__  $$| $$      /$$__  $$| $$| $$| $$_____/| $$      | $$      | $$| $$
+  | $$$$$$$/|  $$$$$$$| $$     |  $$$$$$$| $$| $$|  $$$$$$$| $$      |  $$$$$$$| $$| $$
+  | $$____/  \\_______/|__/      \\_______/|__/|__/ \\_______/|__/       \\_______/|__/|__/
+  | $$   -- parallel cli settings -- RECORDKEY: ${RECORDKEY || '<not set>'} --
+  | $$   -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
+  | $$   -- BROWSERS: ${BROWSERS.join(',')} -- PARALLEL: ${PARALLEL} --
+  |__/   -- LATEST DASHBOARD RESULT: ${DASHBOARD || '<not set>'} --`
 }
 
 // from the name itself, it gets the directories from provided path
@@ -228,11 +229,7 @@ const runtest = async () => {
   // https://docs.cypress.io/guides/guides/parallelization#Linking-CI-machines-for-parallelization-or-grouping
   const uuid = uuidv4()
 
-  const suites = SPECS.map((suite) => {
-    if (['e2e', 'cypress/e2e'].includes(suite)) return 'cypress/e2e'
-    else return `cypress/e2e/${suite}`
-  })
-
+  const suites = SPECS.map((suite) => `${DEFAULT_CYPRESS_DIR}/${suite}`)
   // cypress run command builder
   // TODO: find improvements. current threads/parallel runs per browser
   // TODO: listing spec files by folder, folder selection and greptags selection
@@ -248,6 +245,7 @@ const runtest = async () => {
       command = command.concat(` --spec ${suites.join(',')}`)
       command = command.concat(` --group ${browser} --record --key ${RECORDKEY}`)
       command = command.concat(` --parallel --ci-build-id ${uuid}`)
+      console.log(`${chalk.bold.greenBright(`Running command: `)}${chalk.whiteBright(command)}`)
 
       // run array of threads limited by parallel count
       // cypress dashboard will handle parallellization of tests
@@ -257,31 +255,45 @@ const runtest = async () => {
           .map((_, index) => runnerthread(command, index))
       )
     } else {
+      const specs = [
+        ...new Set(
+          suites
+            .map((suite) =>
+              globSync(`${resolve(__dirname, suite)}/**/*.cy.{ts,js}`, { withFileTypes: true })
+                .filter((path) => path.isFile())
+                .map((file) => file.fullpath())
+            )
+            .flat()
+        ),
+      ]
+
+      if (specs.length === 0) console.log(chalk.bold.redBright('No specs found on selected suites'))
+
       await parallelLimit(
-        // TODO: handle non spec files inside e2e folder
-        suites
-          .map((suite) =>
-            globSync(`${resolve(__dirname, suite)}/**`, { withFileTypes: true })
-              .filter((path) => path.isFile())
-              .map((file) => file.fullpath())
-          )
-          .flat()
-          .map((spec, index) => {
-            return (callback) => {
-              const finalcommand = command.concat(` --spec ${spec}`)
-              runnerthread(finalcommand, index).then(() => callback(null))
-            }
-          }),
+        // use set to filter out redundant specs
+        specs.map((spec, index) => {
+          return (callback) => {
+            const finalcommand = command.concat(` --spec ${spec}`)
+            console.log(
+              `${chalk.bold.greenBright(`[${index + 1}/${specs.length}] Running command: `)}${chalk.whiteBright(
+                finalcommand
+              )}`
+            )
+            runnerthread(finalcommand, index).then(() => callback(null))
+          }
+        }),
         PARALLEL
       )
     }
 
     // move results to browser specific results folder
-    for (const dirent of readdirSync(DEFAULT_REPORTER_DIR_PATH, { withFileTypes: true })) {
-      if (dirent.isDirectory()) continue
-      const browserdir = resolve(DEFAULT_REPORTER_DIR_PATH, browser)
-      existsSync(browserdir) || mkdirSync(browserdir)
-      renameSync(resolve(DEFAULT_REPORTER_DIR_PATH, dirent.name), resolve(browserdir, dirent.name))
+    if (existsSync(DEFAULT_REPORTER_DIR_PATH)) {
+      for (const dirent of readdirSync(DEFAULT_REPORTER_DIR_PATH, { withFileTypes: true })) {
+        if (dirent.isDirectory()) continue
+        const browserdir = resolve(DEFAULT_REPORTER_DIR_PATH, browser)
+        existsSync(browserdir) || mkdirSync(browserdir)
+        renameSync(resolve(DEFAULT_REPORTER_DIR_PATH, dirent.name), resolve(browserdir, dirent.name))
+      }
     }
   }
 }
@@ -433,9 +445,9 @@ const menuprompt = () => {
               type: 'confirm',
               name: 'confirm',
               message: `Are you sure you want to run cypress tests with these settings:
-     -- RECORDKEY: ${RECORDKEY || '<not set>'} --
-     -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
-     -- BROWSERS: ${BROWSERS} -- PARALLEL: ${PARALLEL} --`,
+      -- RECORDKEY: ${RECORDKEY || '<not set>'} --
+      -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
+      -- BROWSERS: ${BROWSERS} -- PARALLEL: ${PARALLEL} --`,
               default: false,
             })
             .then(async ({ confirm }) => {
@@ -585,9 +597,11 @@ const settingsprompt = () => {
           break
         case settingschoices[1]:
           // get suites under cypress/e2e
-          const suites = globSync(`${resolve(__dirname, DEFAULT_SPECS_DIR)}/**`, { withFileTypes: true })
+          const suites = globSync(`${resolve(__dirname, DEFAULT_CYPRESS_DIR, DEFAULT_SPECS_DIR)}/**`, {
+            withFileTypes: true,
+          })
             .filter((g) => g.isDirectory())
-            .map((g) => basename(g.fullpath()))
+            .map((g) => g.fullpath().replace(resolve(__dirname, DEFAULT_CYPRESS_DIR), '').substring(1))
 
           // generate choices, currently allowing suites/folder choices
           const suitechoices = suites.map((suite) => {
