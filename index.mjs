@@ -1,17 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * before using this, you need to install the ff dependencies, use one of commands below
- *   "conf": "^11.0.1", "inquirer": "^9.1.4", "mocha": "^10.2.0", "table": "^6.8.1", "uuid": "^9.0.0"
- *
- * $ npm install chalk conf inquirer mocha table uuid
- * $ pnpm add chalk conf inquirer mocha table uuid
- *
- * execute this script using node
- * $ node parallel.mjs
- *
  * Having problems? Message me
- * Maintainer: Krizzchanne Cid <kcid@cambridge.org>
+ * Maintainer: Krizzchanne Cid <kmcid@mail.ru>
  *
  * TODOs:
  *  - Test using windows machine (compatibility)
@@ -27,7 +18,6 @@ import { parallelLimit } from 'async'
 import { v4 as uuidv4 } from 'uuid'
 
 import { spawn } from 'node:child_process'
-// import { fileURLToPath } from 'url'
 import { resolve, basename } from 'path'
 import { writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
@@ -35,10 +25,6 @@ import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
 import PressToContinuePrompt from 'inquirer-press-to-continue'
 inquirer.registerPrompt('press-to-continue', PressToContinuePrompt)
 
-// __dirname is not working (used for fetching specs):
-// https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c#what-do-i-use-instead-of-__dirname-and-__filename
-// const __filename = fileURLToPath(import.meta.url)
-// const __dirname = dirname(__filename)
 const __dirname = process.cwd()
 
 if (!existsSync(resolve(__dirname, 'package.json'))) throw new Error('Current directory is not a node project')
@@ -71,7 +57,6 @@ const config = new Conf({
       minItems: 0,
     },
     recordkey: { type: 'string' },
-    // TODO: strict mode: "items" is 1-tuple, but minItems or maxItems/additionalItems are not specified or different at path "#/properties/specs"
     specs: {
       type: 'array',
       items: [{ type: 'string' }],
@@ -395,20 +380,6 @@ const showcliresultstable = () => {
   tabledata.unshift(
     ['Browser', 'Spec', 'Date', 'Tests', 'Passed', 'Failed', 'Duration'].map((x) => chalk.bold.greenBright(x))
   )
-
-  /**
-   * "tabledata" should look like this (without the gibberish coloring), real data log from canvas project
-   * so yes, stop wondering how this "tabledata" looks like before it is displayed beautifully
-   * [
-   *  ['Browser','Spec','Date','Tests','Passed','Failed','Duration'],
-   *  ["chrome","cypress/e2e/canvas-regression/buttons.cy.ts","2023-02-20T18:05:02.707Z",3,3,0,66959],
-   *  ["chrome","cypress/e2e/canvas-regression/sidebar.cy.ts","2023-02-20T18:05:09.745Z",1,1,0,13391],
-   *  ["Totals", "", "", 4, 4, 0, 80350],
-   *  ["electron","cypress/e2e/canvas-regression/buttons.cy.ts","2023-02-20T18:02:30.555Z",3,3,0,78557],
-   *  ["electron","cypress/e2e/canvas-regression/sidebar.cy.ts","2023-02-20T18:02:29.624Z",1,1,0,16392],
-   *  ["Totals", "", "", 4, 4, 0, 94949],
-   * ]
-   */
 
   console.log('\n')
   console.log(table(tabledata, { columns: [{ alignment: 'center', width: 12 }], spanningCells: spanningcells }))
