@@ -245,6 +245,9 @@ const runtest = async () => {
       command = command.concat(` --spec ${suites.join(',')}`)
       command = command.concat(` --group ${browser} --record --key ${RECORDKEY}`)
       command = command.concat(` --parallel --ci-build-id ${uuid}`)
+
+      if (PRESET) command = command.concat(` --tag parallel-cli,${PRESET}`)
+
       console.log(`${chalk.bold.greenBright(`Running command: `)}${chalk.whiteBright(command)}`)
 
       // run array of threads limited by parallel count
