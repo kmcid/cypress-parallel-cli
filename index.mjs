@@ -41,6 +41,8 @@ inquirer.registerPrompt('press-to-continue', PressToContinuePrompt)
 // const __dirname = dirname(__filename)
 const __dirname = process.cwd()
 
+if (!existsSync(resolve(__dirname, 'package.json'))) throw new Error('Current directory is not a node project')
+
 const packagejson = JSON.parse(readFileSync(resolve(__dirname, 'package.json')))
 // sometimes package.json does not have a name, use folder name
 const packagejsonname = packagejson?.name || basename(__dirname)
@@ -854,7 +856,7 @@ const getavailablebrowsers = () => {
   })
 }
 
-;(async () => {
+;async () => {
   // clearing console to remove config warnings
   console.clear()
 
@@ -932,4 +934,4 @@ const getavailablebrowsers = () => {
   // a little bit of delay before starting cli app
   await sleep(1000)
   menuprompt()
-})()
+}
