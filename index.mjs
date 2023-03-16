@@ -827,7 +827,7 @@ const getavailablebrowsers = () => {
   })
 }
 
-;async () => {
+;(async () => {
   // clearing console to remove config warnings
   console.clear()
 
@@ -905,4 +905,4 @@ const getavailablebrowsers = () => {
   // a little bit of delay before starting cli app
   await sleep(1000)
   menuprompt()
-}
+})()
