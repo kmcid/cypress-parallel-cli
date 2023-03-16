@@ -249,7 +249,10 @@ const runtest = async () => {
         ...new Set(
           suites
             .map((suite) =>
-              globSync(`${resolve(__dirname, suite)}/**/*.cy.{ts,js}`, { withFileTypes: true })
+              globSync(`${resolve(__dirname, suite)}/**/*.cy.{ts,js}`, {
+                withFileTypes: true,
+                windowsPathsNoEscape: true,
+              })
                 .filter((path) => path.isFile())
                 .map((file) => file.fullpath())
             )
@@ -575,6 +578,7 @@ const settingsprompt = () => {
           // get suites under cypress/e2e
           const suites = globSync(`${resolve(__dirname, DEFAULT_CYPRESS_DIR, DEFAULT_SPECS_DIR)}/**`, {
             withFileTypes: true,
+            windowsPathsNoEscape: true,
           })
             .filter((g) => g.isDirectory())
             .map((g) => g.fullpath().replace(resolve(__dirname, DEFAULT_CYPRESS_DIR), '').substring(1))
