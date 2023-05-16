@@ -116,6 +116,13 @@ const loadpreset = () => {
   }
 }
 
+// array into chunks
+function* chunks(arr, n) {
+  for (let i = 0; i < arr.length; i += n) {
+    yield arr.slice(i, i + n)
+  }
+}
+
 // clear cli then display banner
 const resetcli = () => {
   console.clear()
@@ -125,18 +132,18 @@ const resetcli = () => {
 // ASCII Art from: https://patorjk.com/software/taag/#p=display&h=1&v=2&f=Big%20Money-ne&t=parallel%20cli
 const generatebanner = () => {
   return `
-                                          /$$ /$$           /$$                 /$$ /$$
-                                         | $$| $$          | $$                | $$|__/
-    /$$$$$$   /$$$$$$   /$$$$$$  /$$$$$$ | $$| $$  /$$$$$$ | $$        /$$$$$$$| $$ /$$
-   /$$__  $$ |____  $$ /$$__  $$|____  $$| $$| $$ /$$__  $$| $$       /$$_____/| $$| $$
-  | $$  \\ $$  /$$$$$$$| $$  \\__/ /$$$$$$$| $$| $$| $$$$$$$$| $$      | $$      | $$| $$
-  | $$  | $$ /$$__  $$| $$      /$$__  $$| $$| $$| $$_____/| $$      | $$      | $$| $$
-  | $$$$$$$/|  $$$$$$$| $$     |  $$$$$$$| $$| $$|  $$$$$$$| $$      |  $$$$$$$| $$| $$
-  | $$____/  \\_______/|__/      \\_______/|__/|__/ \\_______/|__/       \\_______/|__/|__/
-  | $$   -- parallel cli settings -- RECORDKEY: ${RECORDKEY || '<not set>'} --
-  | $$   -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
-  | $$   -- BROWSERS: ${BROWSERS.join(',')} -- PARALLEL: ${PARALLEL} --
-  |__/   -- LATEST DASHBOARD RESULT: ${DASHBOARD || '<not set>'} --`
+                                           /$$ /$$           /$$                 /$$ /$$
+                                          | $$| $$          | $$                | $$|__/
+     /$$$$$$   /$$$$$$   /$$$$$$  /$$$$$$ | $$| $$  /$$$$$$ | $$        /$$$$$$$| $$ /$$
+    /$$__  $$ |____  $$ /$$__  $$|____  $$| $$| $$ /$$__  $$| $$       /$$_____/| $$| $$
+   | $$  \\ $$  /$$$$$$$| $$  \\__/ /$$$$$$$| $$| $$| $$$$$$$$| $$      | $$      | $$| $$
+   | $$  | $$ /$$__  $$| $$      /$$__  $$| $$| $$| $$_____/| $$      | $$      | $$| $$
+   | $$$$$$$/|  $$$$$$$| $$     |  $$$$$$$| $$| $$|  $$$$$$$| $$      |  $$$$$$$| $$| $$
+   | $$____/  \\_______/|__/      \\_______/|__/|__/ \\_______/|__/       \\_______/|__/|__/
+   | $$   -- parallel cli settings -- RECORDKEY: ${RECORDKEY || '<not set>'} --
+   | $$   -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
+   | $$   -- BROWSERS: ${BROWSERS.join(',')} -- PARALLEL: ${PARALLEL} --
+   |__/   -- LATEST DASHBOARD RESULT: ${DASHBOARD || '<not set>'} --`
 }
 
 // from the name itself, it gets the directories from provided path
@@ -262,13 +269,14 @@ const runtest = async () => {
 
       if (specs.length === 0) console.log(chalk.bold.redBright('No specs found on selected suites'))
 
+      const specsAsChunks = [...chunks(specs, PARALLEL)]
       await parallelLimit(
         // use set to filter out redundant specs
-        specs.map((spec, index) => {
+        specsAsChunks.map((chunk, index) => {
           return (callback) => {
-            const finalcommand = command.concat(` --spec ${spec}`)
+            const finalcommand = command.concat(` --spec ${chunk.join(',')}`)
             console.log(
-              `${chalk.bold.greenBright(`[${index + 1}/${specs.length}] Running command: `)}${chalk.whiteBright(
+              `${chalk.bold.greenBright(`[${index + 1}/${specsAsChunks.length}] Running command: `)}${chalk.whiteBright(
                 finalcommand
               )}`
             )
@@ -424,9 +432,9 @@ const menuprompt = () => {
               type: 'confirm',
               name: 'confirm',
               message: `Are you sure you want to run cypress tests with these settings:
-      -- RECORDKEY: ${RECORDKEY || '<not set>'} --
-      -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
-      -- BROWSERS: ${BROWSERS} -- PARALLEL: ${PARALLEL} --`,
+       -- RECORDKEY: ${RECORDKEY || '<not set>'} --
+       -- SPECS: ${SPECS} -- ENV: ${ENVVARS || '<not set>'} --
+       -- BROWSERS: ${BROWSERS} -- PARALLEL: ${PARALLEL} --`,
               default: false,
             })
             .then(async ({ confirm }) => {
