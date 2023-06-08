@@ -117,10 +117,10 @@ const loadpreset = () => {
 }
 
 // array into chunks
-function* chunks(arr, n) {
-  for (let i = 0; i < arr.length; i += n) {
-    yield arr.slice(i, i + n)
-  }
+function chunks(arr, n) {
+  const _arr = []
+  for (let i = n; i > 0; i--) _arr.push(arr.splice(0, Math.ceil(arr.length / i)))
+  return _arr
 }
 
 // clear cli then display banner
@@ -269,7 +269,7 @@ const runtest = async () => {
 
       if (specs.length === 0) console.log(chalk.bold.redBright('No specs found on selected suites'))
 
-      const specsAsChunks = [...chunks(specs, PARALLEL)]
+      const specsAsChunks = chunks(specs, PARALLEL)
       await parallelLimit(
         // use set to filter out redundant specs
         specsAsChunks.map((chunk, index) => {
