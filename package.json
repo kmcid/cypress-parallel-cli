@@ -1,7 +1,7 @@
 {
   "name": "@kmcid/cypress-parallel-cli",
   "description": "CLI app for running parallel cypress tests",
-  "version": "1.6.4",
+  "version": "1.7.0",
   "license": "MIT",
   "author": "Krizzchanne Cid <kmcid@mail.ru>",
   "main": "index.mjs",
