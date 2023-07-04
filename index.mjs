@@ -18,9 +18,9 @@ import { parallelLimit } from 'async'
 import { v4 as uuidv4 } from 'uuid'
 
 import { spawn } from 'node:child_process'
-import { resolve, basename } from 'path'
+import { resolve, basename, parse } from 'path'
 import { writeFileSync, readdirSync, existsSync } from 'node:fs'
-import { readFileSync, rmSync, renameSync, mkdirSync } from 'node:fs'
+import { readFileSync, rmSync, renameSync, mkdirSync, copyFileSync } from 'node:fs'
 
 import PressToContinuePrompt from 'inquirer-press-to-continue'
 inquirer.registerPrompt('press-to-continue', PressToContinuePrompt)
@@ -34,6 +34,8 @@ const packagejson = JSON.parse(readFileSync(resolve(__dirname, 'package.json')))
 const packagejsonname = packagejson?.name || basename(__dirname)
 
 // default and global variables
+const PARALLEL_CLI_CONFIG = 'parallel-cli.json'
+const PARALLEL_CLI_CONFIG_PATH = resolve(__dirname, PARALLEL_CLI_CONFIG)
 const DEFAULT_CYPRESS_DIR = 'cypress'
 const DEFAULT_SPECS_DIR = 'e2e'
 const DEFAULT_SPECS = [DEFAULT_SPECS_DIR]
@@ -46,9 +48,13 @@ const DEFAULT_REPORTER_DIR_PATH = resolve(__dirname, DEFAULT_REPORTER_DIR)
 // variables for conf, we do not want to fetch it everytime
 let PRESET, PRESETS, RECORDKEY, SPECS, ENVVARS, BROWSERS, PARALLEL, DASHBOARD
 
+const useLocalConfig = existsSync(PARALLEL_CLI_CONFIG_PATH)
+
 // configuration of conf storage for parallel cli settings
 const config = new Conf({
   projectName: packagejsonname,
+  configName: useLocalConfig ? parse(PARALLEL_CLI_CONFIG).name : null,
+  cwd: useLocalConfig ? __dirname : null,
   schema: {
     preset: { type: 'string' },
     presets: {
@@ -842,6 +848,15 @@ const getavailablebrowsers = () => {
 ;(async () => {
   // clearing console to remove config warnings
   console.clear()
+
+  // move conf config file to cwd, and start using it as config
+  if (!existsSync(PARALLEL_CLI_CONFIG_PATH)) {
+    copyFileSync(config.path, PARALLEL_CLI_CONFIG_PATH)
+    console.log(chalk.cyanBright('We have moved parallel-cli config to project folder.'))
+    console.log(chalk.cyanBright('Restart the app to apply local config.'))
+    process.exitCode = 1
+    return
+  }
 
   // catch RUN command for direct preset runs
   const args = process.argv.slice(2)
